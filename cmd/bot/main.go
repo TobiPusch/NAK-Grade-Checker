@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -445,6 +446,97 @@ func extractGrades(text string) []Grade {
 
 func notify(module, grade string) {
 	msg := fmt.Sprintf("New Grade: %s - %s", module, grade)
+
+	// Local Notification
 	cmd := exec.Command("notify-send", "GradeChecker", msg)
 	cmd.Run()
+
+	// Discord Notification
+	discordEnabled := os.Getenv("DISCORD_ENABLED")
+	if discordEnabled == "true" || discordEnabled == "1" || discordEnabled == "yes" {
+		mode := os.Getenv("DISCORD_MODE")
+		if mode == "dm" {
+			token := os.Getenv("DISCORD_BOT_TOKEN")
+			userID := os.Getenv("DISCORD_USER_ID")
+			if token != "" && userID != "" {
+				sendDiscordDM(token, userID, msg)
+			}
+		} else {
+			webhookURL := os.Getenv("DISCORD_WEBHOOK_URL")
+			if webhookURL != "" {
+				sendDiscordNotification(webhookURL, msg)
+			}
+		}
+	}
+}
+
+func sendDiscordNotification(webhookURL, message string) {
+	payload := fmt.Sprintf(`{"content": "%s"}`, message)
+	resp, err := http.Post(webhookURL, "application/json", strings.NewReader(payload))
+	if err != nil {
+		log.Println("Failed to send Discord notification:", err)
+		return
+	}
+	defer resp.Body.Close()
+}
+
+func sendDiscordDM(token, userID, message string) {
+	// 1. Create DM Channel
+	createDMPayload := fmt.Sprintf(`{"recipient_id": "%s"}`, userID)
+	req, err := http.NewRequest("POST", "https://discord.com/api/v10/users/@me/channels", strings.NewReader(createDMPayload))
+	if err != nil {
+		log.Println("Failed to create DM request:", err)
+		return
+	}
+	req.Header.Set("Authorization", "Bot "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Failed to create DM channel:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Failed to create DM channel (Status %d): %s\n", resp.StatusCode, string(body))
+		return
+	}
+
+	// Parse Channel ID
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Println("Failed to parse DM channel response:", err)
+		return
+	}
+
+	channelID, ok := result["id"].(string)
+	if !ok {
+		log.Println("Failed to get channel ID from response")
+		return
+	}
+
+	// 2. Send Message
+	msgPayload := fmt.Sprintf(`{"content": "%s"}`, message)
+	req, err = http.NewRequest("POST", fmt.Sprintf("https://discord.com/api/v10/channels/%s/messages", channelID), strings.NewReader(msgPayload))
+	if err != nil {
+		log.Println("Failed to create message request:", err)
+		return
+	}
+	req.Header.Set("Authorization", "Bot "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err = client.Do(req)
+	if err != nil {
+		log.Println("Failed to send DM:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Failed to send DM (Status %d): %s\n", resp.StatusCode, string(body))
+	}
 }

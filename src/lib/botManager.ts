@@ -30,7 +30,7 @@ class BotManager {
             });
 
             this.process.stderr?.on('data', (data) => {
-                this.log(`ERROR: ${data.toString()}`);
+                this.log(data.toString());
             });
 
             this.process.on('close', (code) => {

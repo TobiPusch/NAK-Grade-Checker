@@ -47,6 +47,23 @@ if (Astro.request.method === "POST") {
                 }
                 message = "Einstellungen gespeichert!";
                 msgType = "success";
+            } else if (formType === "notifications") {
+                const discordEnabled = data.get("discordEnabled") === "on";
+                const discordMode =
+                    data.get("discordMode")?.toString() || "webhook";
+                const discordWebhook = data.get("discordWebhook")?.toString();
+                const discordBotToken = data.get("discordBotToken")?.toString();
+                const discordUserId = data.get("discordUserId")?.toString();
+
+                newEnv.DISCORD_ENABLED = discordEnabled ? "true" : "false";
+                newEnv.DISCORD_MODE = discordMode;
+
+                if (discordWebhook) newEnv.DISCORD_WEBHOOK_URL = discordWebhook;
+                if (discordBotToken) newEnv.DISCORD_BOT_TOKEN = discordBotToken;
+                if (discordUserId) newEnv.DISCORD_USER_ID = discordUserId;
+
+                message = "Benachrichtigungseinstellungen gespeichert!";
+                msgType = "success";
             }
 
             // Write back to .env
@@ -79,6 +96,94 @@ if (Astro.request.method === "POST") {
     <div class="glass-panel">
         <h1>Einstellungen</h1>
         {message && <div class={`message ${msgType}`}>{message}</div>}
+
+        <div class="settings-section">
+            <h2>Benachrichtigungen</h2>
+            <form method="POST" id="notifyForm">
+                <input type="hidden" name="formType" value="notifications" />
+                <div class="form-group checkbox-group">
+                    <label class="switch">
+                        <input
+                            type="checkbox"
+                            name="discordEnabled"
+                            checked={envConfig.DISCORD_ENABLED === "true"}
+                        />
+                        <span class="slider round"></span>
+                    </label>
+                    <span class="label-text"
+                        >Discord Benachrichtigungen aktivieren</span
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="discordMode">Modus</label>
+                    <select
+                        id="discordMode"
+                        name="discordMode"
+                        class="form-select"
+                    >
+                        <option
+                            value="webhook"
+                            selected={envConfig.DISCORD_MODE !== "dm"}
+                            >Webhook (Kanal)</option
+                        >
+                        <option
+                            value="dm"
+                            selected={envConfig.DISCORD_MODE === "dm"}
+                            >Direct Message (Privat)</option
+                        >
+                    </select>
+                </div>
+
+                <div
+                    id="webhook-section"
+                    class={envConfig.DISCORD_MODE === "dm" ? "hidden" : ""}
+                >
+                    <div class="form-group">
+                        <label for="discordWebhook">Discord Webhook URL</label>
+                        <input
+                            type="text"
+                            id="discordWebhook"
+                            name="discordWebhook"
+                            placeholder="https://discord.com/api/webhooks/..."
+                            value={envConfig.DISCORD_WEBHOOK_URL || ""}
+                        />
+                    </div>
+                </div>
+
+                <div
+                    id="dm-section"
+                    class={envConfig.DISCORD_MODE !== "dm" ? "hidden" : ""}
+                >
+                    <div class="form-group">
+                        <label for="discordBotToken">Bot Token</label>
+                        <input
+                            type="password"
+                            id="discordBotToken"
+                            name="discordBotToken"
+                            placeholder="MTE..."
+                            value={envConfig.DISCORD_BOT_TOKEN || ""}
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="discordUserId">User ID</label>
+                        <input
+                            type="text"
+                            id="discordUserId"
+                            name="discordUserId"
+                            placeholder="123456789..."
+                            value={envConfig.DISCORD_USER_ID || ""}
+                        />
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button type="submit" class="btn">Speichern</button>
+                </div>
+            </form>
+        </div>
+        <div class="divider"></div>
+
         <div class="settings-section">
             <h2>Zugangsdaten</h2>
             <form method="POST">
@@ -147,6 +252,25 @@ if (Astro.request.method === "POST") {
                 </div>
             </form>
         </div>
+
+        <script>
+            const modeSelect = document.getElementById("discordMode");
+            const webhookSection = document.getElementById("webhook-section");
+            const dmSection = document.getElementById("dm-section");
+
+            if (modeSelect && webhookSection && dmSection) {
+                modeSelect.addEventListener("change", (e) => {
+                    const val = (e.target as HTMLSelectElement).value;
+                    if (val === "dm") {
+                        webhookSection.classList.add("hidden");
+                        dmSection.classList.remove("hidden");
+                    } else {
+                        webhookSection.classList.remove("hidden");
+                        dmSection.classList.add("hidden");
+                    }
+                });
+            }
+        </script>
         <div class="actions-main">
             <a href="/" class="btn btn-secondary">Zurück zur Übersicht</a>
         </div>
@@ -196,5 +320,81 @@ if (Astro.request.method === "POST") {
         background: rgba(239, 68, 68, 0.1);
         color: #f87171;
         border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    /* Toggle Switch */
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+    }
+
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.1);
+        transition: 0.4s;
+        border-radius: 34px;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+    }
+
+    input:checked + .slider {
+        background-color: #34d399;
+    }
+
+    input:checked + .slider:before {
+        transform: translateX(26px);
+    }
+
+    .label-text {
+        font-weight: 500;
+    }
+
+    .form-select {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 1rem;
+        outline: none;
+    }
+
+    .form-select:focus {
+        border-color: rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .hidden {
+        display: none;
     }
 </style>
