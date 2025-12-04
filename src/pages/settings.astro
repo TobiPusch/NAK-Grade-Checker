@@ -39,6 +39,35 @@ try {
     console.error("Failed to check for updates:", e);
 }
 
+// Integrity Check
+import db from "../lib/db";
+let integrityStatus = "UNKNOWN";
+let integrityHash = "";
+let statusColor = "#fbbf24"; // yellow/warning
+let statusText = "Unbekannt";
+
+try {
+    const statusRow = db
+        .prepare("SELECT value FROM system_status WHERE key = ?")
+        .get("integrity_status") as { value: string } | undefined;
+    const hashRow = db
+        .prepare("SELECT value FROM system_status WHERE key = ?")
+        .get("integrity_hash") as { value: string } | undefined;
+
+    if (statusRow) integrityStatus = statusRow.value;
+    if (hashRow) integrityHash = hashRow.value;
+
+    if (integrityStatus === "OFFICIAL") {
+        statusColor = "#34d399"; // green
+        statusText = "Offiziell (Verifiziert)";
+    } else if (integrityStatus === "MODIFIED") {
+        statusColor = "#f87171"; // red
+        statusText = "Modifiziert / Fork";
+    }
+} catch (e) {
+    console.error("Failed to fetch integrity status:", e);
+}
+
 if (Astro.request.method === "POST") {
     const contentType = Astro.request.headers.get("content-type");
     if (
@@ -157,48 +186,23 @@ if (Astro.request.method === "POST") {
                     v{currentVersion}
                 </div>
             </div>
-            
-            {
-                (() => {
-                    // Fetch integrity status from DB
-                    try {
-                        const db = (await import("../lib/db")).default;
-                        const statusRow = db.prepare("SELECT value FROM system_status WHERE key = ?").get("integrity_status") as { value: string } | undefined;
-                        const hashRow = db.prepare("SELECT value FROM system_status WHERE key = ?").get("integrity_hash") as { value: string } | undefined;
-                        
-                        const status = statusRow?.value || "UNKNOWN";
-                        const hash = hashRow?.value || "";
-                        
-                        let statusColor = "#fbbf24"; // yellow/warning
-                        let statusText = "Unbekannt";
-                        
-                        if (status === "OFFICIAL") {
-                            statusColor = "#34d399"; // green
-                            statusText = "Offiziell (Verifiziert)";
-                        } else if (status === "MODIFIED") {
-                            statusColor = "#f87171"; // red
-                            statusText = "Modifiziert / Fork";
-                        }
 
-                        return (
-                            <div class="form-group">
-                                <label>Integritäts-Status</label>
-                                <div
-                                    style={`padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid ${statusColor}; color: ${statusColor}; font-weight: bold;`}
-                                >
-                                    {statusText}
-                                </div>
-                                {status === "MODIFIED" && hash && (
-                                    <div style="margin-top: 0.5rem; font-size: 0.8rem; color: rgba(255,255,255,0.5); word-break: break-all;">
-                                        Lokaler Hash: {hash}
-                                    </div>
-                                )}
+            {
+                (
+                    <div class="form-group">
+                        <label>Integritäts-Status</label>
+                        <div
+                            style={`padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid ${statusColor}; color: ${statusColor}; font-weight: bold;`}
+                        >
+                            {statusText}
+                        </div>
+                        {integrityStatus === "MODIFIED" && integrityHash && (
+                            <div style="margin-top: 0.5rem; font-size: 0.8rem; color: rgba(255,255,255,0.5); word-break: break-all;">
+                                Lokaler Hash: {integrityHash}
                             </div>
-                        );
-                    } catch (e) {
-                        return null;
-                    }
-                })()
+                        )}
+                    </div>
+                )
             }
         </div>
         <div class="divider"></div>
