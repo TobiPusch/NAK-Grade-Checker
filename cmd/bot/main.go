@@ -36,9 +36,31 @@ type Grade struct {
 	OccurrenceIndex int
 }
 
+type VersionConfig struct {
+	Version string `json:"version"`
+}
+
+type GitHubRelease struct {
+	TagName string `json:"tag_name"`
+	Body    string `json:"body"`
+	HTMLURL string `json:"html_url"`
+}
+
 func main() {
 	// Load .env
 	godotenv.Load()
+
+	// Load Version
+	versionFile, err := os.ReadFile("version.json")
+	if err != nil {
+		log.Println("Warning: Could not read version.json:", err)
+	}
+	var versionConfig VersionConfig
+	if err == nil {
+		json.Unmarshal(versionFile, &versionConfig)
+		log.Printf("Starting GradeChecker v%s\n", versionConfig.Version)
+		go checkForUpdates(versionConfig.Version)
+	}
 
 	// Init DB
 	db, err := sql.Open("sqlite3", dbFile)
@@ -538,5 +560,39 @@ func sendDiscordDM(token, userID, message string) {
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		log.Printf("Failed to send DM (Status %d): %s\n", resp.StatusCode, string(body))
+	}
+}
+
+func checkForUpdates(currentVersion string) {
+	log.Println("Checking for updates...")
+	resp, err := http.Get("https://api.github.com/repos/Tom60/GradeChecker/releases/latest")
+	if err != nil {
+		log.Println("Failed to check for updates:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("Failed to check for updates, status: %d\n", resp.StatusCode)
+		return
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		log.Println("Failed to parse release info:", err)
+		return
+	}
+
+	// Simple version comparison (assuming vX.Y.Z format)
+	// Remove 'v' prefix if present for comparison
+	remoteVer := strings.TrimPrefix(release.TagName, "v")
+	localVer := strings.TrimPrefix(currentVersion, "v")
+
+	if remoteVer != localVer {
+		msg := fmt.Sprintf("Update Available! New version: %s (Current: %s)\nDownload here: %s", release.TagName, currentVersion, release.HTMLURL)
+		log.Println(msg)
+		notify("System", msg)
+	} else {
+		log.Println("GradeChecker is up to date.")
 	}
 }
