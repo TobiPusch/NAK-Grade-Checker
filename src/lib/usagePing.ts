@@ -35,10 +35,21 @@ export async function checkAndSendPing() {
         // Send ping
         const url = Buffer.from(PING_URL_BASE64, 'base64').toString('utf-8');
 
+        // Check integrity status
+        let isFork = true;
+        try {
+            const integrityRow = db.prepare('SELECT value FROM system_status WHERE key = ?').get('integrity_status') as { value: string } | undefined;
+            if (integrityRow && integrityRow.value === 'OFFICIAL') {
+                isFork = false;
+            }
+        } catch (e) {
+            console.error('Failed to read integrity status:', e);
+        }
+
         const body = {
             app_name: "GradeChecker",
             app_version: versionConfig.version,
-            is_fork: false // Assuming this is the main distribution for now
+            is_fork: isFork
         };
 
         const response = await fetch(url, {

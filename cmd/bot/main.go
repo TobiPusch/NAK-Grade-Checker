@@ -23,8 +23,6 @@ import (
 	"github.com/ledongthuc/pdf"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/net/publicsuffix"
-
-	"gradechecker/pkg/integrity"
 )
 
 const (
@@ -80,10 +78,13 @@ func main() {
 	// Integrity Check
 	cwd, _ := os.Getwd()
 	isOfficial, localHash, err := integrity.CheckIntegrity(cwd)
+	statusVal := "MODIFIED"
 	if err != nil {
 		log.Printf("Integrity Check Failed: %v\n", err)
+		statusVal = "ERROR"
 	} else if isOfficial {
 		log.Println("Integrity Check: OFFICIAL (Matches GitHub)")
+		statusVal = "OFFICIAL"
 	} else {
 		log.Printf("Integrity Check: MODIFIED (Local: %s)\n", localHash)
 	}
@@ -117,6 +118,24 @@ func main() {
 	);`)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// Store Integrity Status
+	_, err = db.Exec(`INSERT INTO system_status (key, value, updated_at) 
+		VALUES ('integrity_status', ?, ?) 
+		ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
+		statusVal, time.Now().Format(time.RFC3339))
+	if err != nil {
+		log.Println("Error storing integrity status:", err)
+	}
+	if localHash != "" {
+		_, err = db.Exec(`INSERT INTO system_status (key, value, updated_at) 
+			VALUES ('integrity_hash', ?, ?) 
+			ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
+			localHash, time.Now().Format(time.RFC3339))
+		if err != nil {
+			log.Println("Error storing integrity hash:", err)
+		}
 	}
 
 	// Setup Client with CookieJar ONCE to persist session
