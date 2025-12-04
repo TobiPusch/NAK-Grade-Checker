@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"gradechecker/pkg/integrity"
 	"io"
 	"log"
 	"net/http"
@@ -22,6 +23,8 @@ import (
 	"github.com/ledongthuc/pdf"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/net/publicsuffix"
+
+	"gradechecker/pkg/integrity"
 )
 
 const (
@@ -72,6 +75,17 @@ func main() {
 		json.Unmarshal(versionFile, &versionConfig)
 		log.Printf("Starting GradeChecker v%s\n", versionConfig.Version)
 		go checkForUpdates(versionConfig.Version)
+	}
+
+	// Integrity Check
+	cwd, _ := os.Getwd()
+	isOfficial, localHash, err := integrity.CheckIntegrity(cwd)
+	if err != nil {
+		log.Printf("Integrity Check Failed: %v\n", err)
+	} else if isOfficial {
+		log.Println("Integrity Check: OFFICIAL (Matches GitHub)")
+	} else {
+		log.Printf("Integrity Check: MODIFIED (Local: %s)\n", localHash)
 	}
 
 	// Init DB
