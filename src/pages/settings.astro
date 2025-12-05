@@ -10,7 +10,14 @@ let msgType = "";
 
 // Load current env to pre-fill
 const envPath = path.resolve(".env");
-const envConfig = dotenv.parse(fs.readFileSync(envPath));
+let envConfig: any = {};
+if (fs.existsSync(envPath)) {
+    try {
+        envConfig = dotenv.parse(fs.readFileSync(envPath));
+    } catch (e) {
+        console.error("Failed to read .env file:", e);
+    }
+}
 
 // Load Version
 import versionConfig from "../../version.json";
@@ -80,7 +87,14 @@ if (Astro.request.method === "POST") {
             const formType = data.get("formType");
 
             // Read existing env to preserve other values
-            const currentEnv = dotenv.parse(fs.readFileSync(envPath));
+            let currentEnv: any = {};
+            if (fs.existsSync(envPath)) {
+                try {
+                    currentEnv = dotenv.parse(fs.readFileSync(envPath));
+                } catch (e) {
+                    console.error("Failed to read .env file:", e);
+                }
+            }
             let newEnv = { ...currentEnv };
 
             if (formType === "credentials") {
