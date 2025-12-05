@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import path from 'node:path';
+import * as path from 'node:path';
 
 class BotManager {
     private process: ChildProcess | null = null;
@@ -7,7 +7,8 @@ class BotManager {
     private readonly MAX_LOGS = 1000;
 
     constructor() {
-        // Initial start if needed, or wait for manual start
+        // Auto-start bot when manager is initialized (e.g. on server start)
+        this.start();
     }
 
     public start() {
@@ -16,7 +17,7 @@ class BotManager {
             return;
         }
 
-        const botPath = path.resolve('gradechecker');
+        const botPath = process.env.BOT_BINARY_PATH || path.resolve('gradechecker');
         this.log(`Starting bot from: ${botPath}`);
 
         try {
