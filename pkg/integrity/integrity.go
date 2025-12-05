@@ -112,3 +112,29 @@ func CheckIntegrity(rootPath string) (bool, string, error) {
 
 	return localHash == remoteData.Hash, localHash, nil
 }
+
+// UpdateChecksumFile calculates the project checksum and writes it to checksum.json
+func UpdateChecksumFile(rootPath string) (string, error) {
+	hash, err := CalculateProjectChecksum(rootPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to calculate checksum: %w", err)
+	}
+
+	data := ChecksumData{
+		Hash: hash,
+	}
+
+	file, err := os.Create(filepath.Join(rootPath, ChecksumFileName))
+	if err != nil {
+		return "", fmt.Errorf("failed to create checksum file: %w", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(data); err != nil {
+		return "", fmt.Errorf("failed to encode checksum data: %w", err)
+	}
+
+	return hash, nil
+}

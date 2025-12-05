@@ -80,6 +80,15 @@ func main() {
 
 	// Integrity Check
 	cwd, _ := os.Getwd()
+
+	// Automatically update checksum file
+	updatedHash, err := integrity.UpdateChecksumFile(cwd)
+	if err != nil {
+		log.Printf("Warning: Failed to update checksum file: %v\n", err)
+	} else {
+		log.Printf("Checksum file updated. New hash: %s\n", updatedHash)
+	}
+
 	isOfficial, localHash, err := integrity.CheckIntegrity(cwd)
 	statusVal := "MODIFIED"
 	if err != nil {
