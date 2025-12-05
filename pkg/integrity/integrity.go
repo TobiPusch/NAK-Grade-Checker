@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 )
 
 const (
@@ -95,7 +96,8 @@ func CheckIntegrity(rootPath string) (bool, string, error) {
 		return false, "", fmt.Errorf("failed to calculate local checksum: %w", err)
 	}
 
-	resp, err := http.Get(GitHubChecksumURL)
+	url := fmt.Sprintf("%s?t=%d", GitHubChecksumURL, time.Now().Unix())
+	resp, err := http.Get(url)
 	if err != nil {
 		return false, localHash, fmt.Errorf("failed to fetch remote checksum: %w", err)
 	}
